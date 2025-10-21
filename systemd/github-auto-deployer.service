@@ -1,0 +1,24 @@
+[Unit]
+Description=GitHub Auto-Deployer
+Documentation=https://github.com/eliasfloreteng/github-auto-deployer
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/home/%i
+ExecStart=/usr/local/bin/github-auto-deployer start
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/%i
+
+[Install]
+WantedBy=multi-user.target
