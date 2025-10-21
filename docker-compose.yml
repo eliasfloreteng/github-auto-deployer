@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  github-auto-deployer:
+    build: .
+    container_name: github-auto-deployer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount your repositories directory
+      # Replace /path/to/your/repos with the actual path on your host
+      - /path/to/your/repos:/repos:rw
+
+      # Mount logs directory for persistence
+      - ./logs:/app/logs
+
+      # Mount GitHub App private key
+      # Replace /path/to/your/github-app-key.pem with the actual path to your private key file
+      - /path/to/your/github-app-key.pem:/app/github-app-key.pem:ro
+
+      # Optional: Mount docker socket if you need to run docker commands
+      # Uncomment the line below if your deployment commands use docker
+      # - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # GitHub App Configuration
+      - GITHUB_APP_ID=${GITHUB_APP_ID}
+      - GITHUB_APP_PRIVATE_KEY_PATH=${GITHUB_APP_PRIVATE_KEY_PATH}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+
+      # SMTP Configuration
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL}
+
+      # Notification Configuration
+      - DEFAULT_NOTIFICATION_EMAIL=${DEFAULT_NOTIFICATION_EMAIL}
+
+      # Application Configuration
+      - WEBHOOK_PORT=8080
+      - REPOS_PATH=/repos
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    networks:
+      - deployer-network
+
+networks:
+  deployer-network:
+    driver: bridge

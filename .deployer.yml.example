@@ -1,0 +1,17 @@
+# Example .deployer.yml configuration file
+# Place this file in the root of your git repository
+
+# Required: Command to execute after successful git pull
+command: "docker compose up -d --build"
+
+# Optional: Branch to watch (auto-detected from current branch if not specified)
+# branch: "main"
+
+# Optional: Email address for notifications (uses DEFAULT_NOTIFICATION_EMAIL if not specified)
+# notification_email: "dev@example.com"
+
+# Optional: Command timeout in seconds (default: 300)
+# command_timeout: 300
+
+# Optional: Send email on successful deployment (default: false)
+# send_success_email: false
