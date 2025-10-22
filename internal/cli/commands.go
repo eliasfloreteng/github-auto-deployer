@@ -375,6 +375,27 @@ func runAddFolder() error {
 	fmt.Println("Folder added successfully!")
 	fmt.Printf("Watching: %s (branch: %s)\n", repoPath, branch)
 
+	// Check if service is running and offer to restart
+	if isServiceRunning() {
+		fmt.Println()
+		fmt.Print("Service is running. Restart to apply changes? (y/n): ")
+		response, _ := reader.ReadString('\n')
+		response = strings.TrimSpace(strings.ToLower(response))
+
+		if response == "y" || response == "yes" {
+			fmt.Println("Restarting service...")
+			if err := systemd.Stop(); err != nil {
+				fmt.Printf("Warning: Failed to stop service: %v\n", err)
+			}
+			if err := systemd.Start(); err != nil {
+				return fmt.Errorf("failed to start service: %w", err)
+			}
+			fmt.Println("Service restarted successfully!")
+		} else {
+			fmt.Println("Remember to restart the service: systemctl --user restart github-deployer")
+		}
+	}
+
 	return nil
 }
 
@@ -448,6 +469,28 @@ func runRemoveFolder() error {
 	}
 
 	fmt.Printf("Removed: %s\n", removedFolder.Path)
+
+	// Check if service is running and offer to restart
+	if isServiceRunning() {
+		fmt.Println()
+		fmt.Print("Service is running. Restart to apply changes? (y/n): ")
+		response, _ := reader.ReadString('\n')
+		response = strings.TrimSpace(strings.ToLower(response))
+
+		if response == "y" || response == "yes" {
+			fmt.Println("Restarting service...")
+			if err := systemd.Stop(); err != nil {
+				fmt.Printf("Warning: Failed to stop service: %v\n", err)
+			}
+			if err := systemd.Start(); err != nil {
+				return fmt.Errorf("failed to start service: %w", err)
+			}
+			fmt.Println("Service restarted successfully!")
+		} else {
+			fmt.Println("Remember to restart the service: systemctl --user restart github-deployer")
+		}
+	}
+
 	return nil
 }
 
@@ -461,4 +504,14 @@ func runStatus() error {
 
 	fmt.Println(status)
 	return nil
+}
+
+// isServiceRunning checks if the systemd service is currently running
+func isServiceRunning() bool {
+	status, err := systemd.Status()
+	if err != nil {
+		return false
+	}
+	// Check if status contains "active (running)"
+	return strings.Contains(status, "active (running)")
 }
