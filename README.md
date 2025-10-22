@@ -271,6 +271,17 @@ Logs are stored in the `./logs` directory:
 3. Verify git credentials if using private repositories
 4. Check the logs for detailed error messages
 
+### Git Dubious Ownership Errors
+
+**Problem**: Logs show "fatal: detected dubious ownership in repository"
+
+**Solution**: This is already handled in the Dockerfile with `git config --global --add safe.directory '*'`. If you still see this error:
+
+1. Rebuild the Docker image: `docker compose build`
+2. Restart the container: `docker compose up -d`
+
+This error occurs when repositories are mounted from the host with different ownership than the container user. The configuration in the Dockerfile automatically trusts all mounted repositories.
+
 ### Command Execution Failures
 
 1. Verify the command syntax in `.deployer.yml`

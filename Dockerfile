@@ -23,6 +23,10 @@ RUN mkdir -p /app/logs
 # Create repos directory (will be mounted as volume)
 RUN mkdir -p /repos
 
+# Configure git to trust mounted repositories
+# This prevents "dubious ownership" errors when repos are mounted from host
+RUN git config --global --add safe.directory '*'
+
 # Expose webhook port
 EXPOSE 8080
 
