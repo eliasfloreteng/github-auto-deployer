@@ -256,16 +256,16 @@ func runInstall() error {
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	fmt.Println("Installing systemd service...")
-	fmt.Println("Note: This requires sudo privileges")
+	fmt.Println("Installing systemd user service...")
 
 	if err := systemd.Install(execPath); err != nil {
 		return err
 	}
 
 	fmt.Println("Service installed successfully!")
-	fmt.Println("To start the service: sudo systemctl start github-deployer")
-	fmt.Println("To view logs: sudo journalctl -u github-deployer -f")
+	fmt.Println("To start the service: systemctl --user start github-deployer")
+	fmt.Println("To view logs: journalctl --user -u github-deployer -f")
+	fmt.Println("To enable on boot: loginctl enable-linger $USER")
 
 	return nil
 }

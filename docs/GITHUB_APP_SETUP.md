@@ -126,21 +126,21 @@ your-domain.com {
 ### Install as a Service
 
 ```bash
-sudo ./deployer install
+./deployer install
 ```
 
-This will create a systemd service that starts automatically on boot.
+This will create a systemd user service that starts automatically on boot (no sudo required).
 
 ### Start the Service
 
 ```bash
-sudo systemctl start github-deployer
+systemctl --user start github-deployer
 ```
 
 ### Check Status
 
 ```bash
-sudo systemctl status github-deployer
+systemctl --user status github-deployer
 # or
 ./deployer status
 ```
@@ -148,7 +148,15 @@ sudo systemctl status github-deployer
 ### View Logs
 
 ```bash
-sudo journalctl -u github-deployer -f
+journalctl --user -u github-deployer -f
+```
+
+### Enable Lingering (Optional)
+
+To ensure the service runs even when you're not logged in:
+
+```bash
+loginctl enable-linger $USER
 ```
 
 ## Step 7: Add Folders to Watch
@@ -185,7 +193,7 @@ sudo journalctl -u github-deployer -f
 2. Check the logs to see if the webhook was received:
 
    ```bash
-   sudo journalctl -u github-deployer -f
+   journalctl --user -u github-deployer -f
    ```
 
 3. You should see:

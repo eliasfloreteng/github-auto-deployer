@@ -63,19 +63,20 @@ The tool will automatically detect:
 ### 5. Install as Service
 
 ```bash
-sudo ./deployer install
+./deployer install
 ```
 
-This creates a systemd service that:
+This creates a systemd user service that:
 
-- Starts automatically on boot
+- Starts automatically on boot (with lingering enabled)
 - Restarts on failure
 - Logs to journalctl
+- Runs as your user (no sudo required)
 
 ### 6. Start the Service
 
 ```bash
-sudo systemctl start github-deployer
+systemctl --user start github-deployer
 ```
 
 ## Usage
@@ -97,21 +98,24 @@ deployer status            # Check service status
 
 ```bash
 # Start the service
-sudo systemctl start github-deployer
+systemctl --user start github-deployer
 
 # Stop the service
-sudo systemctl stop github-deployer
+systemctl --user stop github-deployer
 
 # Restart the service
-sudo systemctl restart github-deployer
+systemctl --user restart github-deployer
 
 # Check status
-sudo systemctl status github-deployer
+systemctl --user status github-deployer
 # or
 ./deployer status
 
 # View logs
-sudo journalctl -u github-deployer -f
+journalctl --user -u github-deployer -f
+
+# Enable lingering (service runs even when not logged in)
+loginctl enable-linger $USER
 ```
 
 ### Configuration File
