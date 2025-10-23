@@ -47,18 +47,25 @@ You'll be prompted to enter:
 ### 4. Add Folders to Watch
 
 ```bash
-./deployer add-folder
+# Add current directory
+./deployer add
+
+# Or specify a path
+./deployer add /path/to/repo
+
+# Or use relative path
+./deployer add ../my-project
 ```
 
-Enter:
+You'll be prompted for:
 
-- Repository path (must be a git repository)
-- Command to execute after pulling (e.g., `docker compose up -d --pull=auto --build`)
+- Command to execute after pulling (with smart defaults based on your project)
 
 The tool will automatically detect:
 
 - Current branch
 - Remote repository URL
+- Suggest appropriate deployment commands
 
 ### 5. Install as Service
 
@@ -88,9 +95,9 @@ deployer init              # Initialize configuration
 deployer install           # Install as systemd service
 deployer uninstall         # Remove systemd service
 deployer start             # Start webhook server (manual mode)
-deployer add-folder        # Add a folder to watch
-deployer list-folders      # List all watched folders
-deployer remove-folder     # Remove a watched folder
+deployer add [path]        # Add a folder to watch (defaults to current directory)
+deployer list              # List all watched folders
+deployer remove            # Remove a watched folder
 deployer status            # Check service status
 ```
 

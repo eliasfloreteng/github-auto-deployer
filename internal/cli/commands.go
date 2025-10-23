@@ -67,19 +67,24 @@ var startCmd = &cobra.Command{
 	},
 }
 
-var addFolderCmd = &cobra.Command{
-	Use:   "add-folder",
+var addCmd = &cobra.Command{
+	Use:   "add [path]",
 	Short: "Add a folder to watch",
-	Long:  `Interactively add a git repository folder to watch for changes.`,
+	Long:  `Add a git repository folder to watch for changes. If no path is provided, uses current directory.`,
+	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := runAddFolder(); err != nil {
+		var path string
+		if len(args) > 0 {
+			path = args[0]
+		}
+		if err := runAddFolder(path); err != nil {
 			log.Fatalf("Failed to add folder: %v", err)
 		}
 	},
 }
 
-var listFoldersCmd = &cobra.Command{
-	Use:   "list-folders",
+var listCmd = &cobra.Command{
+	Use:   "list",
 	Short: "List watched folders",
 	Long:  `Display all folders currently being watched.`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -89,8 +94,8 @@ var listFoldersCmd = &cobra.Command{
 	},
 }
 
-var removeFolderCmd = &cobra.Command{
-	Use:   "remove-folder",
+var removeCmd = &cobra.Command{
+	Use:   "remove",
 	Short: "Remove a watched folder",
 	Long:  `Remove a folder from the watch list.`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -116,9 +121,9 @@ func init() {
 	rootCmd.AddCommand(installCmd)
 	rootCmd.AddCommand(uninstallCmd)
 	rootCmd.AddCommand(startCmd)
-	rootCmd.AddCommand(addFolderCmd)
-	rootCmd.AddCommand(listFoldersCmd)
-	rootCmd.AddCommand(removeFolderCmd)
+	rootCmd.AddCommand(addCmd)
+	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(statusCmd)
 }
 
@@ -239,7 +244,7 @@ func runInit() error {
 
 	fmt.Println()
 	fmt.Printf("Configuration saved to: %s\n", config.GetConfigPath())
-	fmt.Println("You can now add folders to watch using 'deployer add-folder'")
+	fmt.Println("You can now add folders to watch using 'deployer add'")
 
 	return nil
 }
@@ -305,7 +310,7 @@ func runStart() error {
 	return nil
 }
 
-func runAddFolder() error {
+func runAddFolder(providedPath string) error {
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
@@ -313,14 +318,40 @@ func runAddFolder() error {
 	}
 
 	reader := bufio.NewReader(os.Stdin)
+	var repoPath string
 
-	fmt.Println("Add Folder to Watch")
-	fmt.Println("===================")
-	fmt.Println()
+	// If path was provided as argument, use it; otherwise prompt
+	if providedPath != "" {
+		repoPath = providedPath
+	} else {
+		// Default to current directory
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
 
-	fmt.Print("Repository Path (absolute path): ")
-	repoPath, _ := reader.ReadString('\n')
-	repoPath = strings.TrimSpace(repoPath)
+		fmt.Println("Add Folder to Watch")
+		fmt.Println("===================")
+		fmt.Println()
+		fmt.Printf("Repository Path (default: current directory): ")
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		if input == "" {
+			repoPath = cwd
+		} else {
+			repoPath = input
+		}
+	}
+
+	// Convert to absolute path
+	if !filepath.IsAbs(repoPath) {
+		absPath, err := filepath.Abs(repoPath)
+		if err != nil {
+			return fmt.Errorf("failed to convert to absolute path: %w", err)
+		}
+		repoPath = absPath
+	}
 
 	// Expand ~ to home directory
 	if strings.HasPrefix(repoPath, "~") {
@@ -353,9 +384,22 @@ func runAddFolder() error {
 	fmt.Printf("Detected repository: %s\n", repoURL)
 	fmt.Println()
 
-	fmt.Print("Command to execute after pull (e.g., 'docker compose up -d --pull=auto --build'): ")
+	// Suggest default command based on what's in the repository
+	defaultCmd := suggestDefaultCommand(repoPath)
+	if defaultCmd != "" {
+		fmt.Printf("Command to execute after pull (default: %s): ", defaultCmd)
+	} else {
+		fmt.Print("Command to execute after pull (e.g., 'docker compose up -d --pull=auto --build'): ")
+	}
+
 	command, _ := reader.ReadString('\n')
 	command = strings.TrimSpace(command)
+
+	// Use default if no command provided
+	if command == "" && defaultCmd != "" {
+		command = defaultCmd
+		fmt.Printf("Using default command: %s\n", command)
+	}
 
 	// Add folder to configuration
 	folder := config.WatchedFolder{
@@ -408,7 +452,7 @@ func runListFolders() error {
 
 	if len(cfg.Folders) == 0 {
 		fmt.Println("No folders are being watched.")
-		fmt.Println("Add a folder using 'deployer add-folder'")
+		fmt.Println("Add a folder using 'deployer add'")
 		return nil
 	}
 
@@ -514,4 +558,44 @@ func isServiceRunning() bool {
 	}
 	// Check if status contains "active (running)"
 	return strings.Contains(status, "active (running)")
+}
+
+// suggestDefaultCommand suggests a default command based on files in the repository
+func suggestDefaultCommand(repoPath string) string {
+	// Check for docker-compose.yml or compose.yml
+	if fileExists(filepath.Join(repoPath, "docker-compose.yml")) ||
+		fileExists(filepath.Join(repoPath, "compose.yml")) ||
+		fileExists(filepath.Join(repoPath, "docker-compose.yaml")) ||
+		fileExists(filepath.Join(repoPath, "compose.yaml")) {
+		return "docker compose up -d --pull=auto --build"
+	}
+
+	// Check for Dockerfile
+	if fileExists(filepath.Join(repoPath, "Dockerfile")) {
+		return "docker build -t app . && docker run -d app"
+	}
+
+	// Check for package.json (Node.js)
+	if fileExists(filepath.Join(repoPath, "package.json")) {
+		return "npm install && npm run build"
+	}
+
+	// Check for Makefile
+	if fileExists(filepath.Join(repoPath, "Makefile")) {
+		return "make deploy"
+	}
+
+	// Check for requirements.txt (Python)
+	if fileExists(filepath.Join(repoPath, "requirements.txt")) {
+		return "pip install -r requirements.txt"
+	}
+
+	// No suggestion
+	return ""
+}
+
+// fileExists checks if a file exists
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
