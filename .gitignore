@@ -1,5 +1,6 @@
 # Binaries
 deployer
+!deployer/
 *.exe
 *.dll
 *.so
