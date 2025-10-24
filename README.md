@@ -13,15 +13,46 @@ A lightweight, self-contained Go application that automatically deploys your cod
 - 📦 **Single Binary**: Easy to distribute and install
 - 🎯 **Branch-Specific**: Only deploys when the watched branch is pushed to
 
-## Quick Start
+## Installation
 
-### 1. Build the Application
+### Option 1: Download Pre-built Binary (Recommended)
+
+Download the latest release for your platform from the [Releases page](https://github.com/eliasfloreteng/github-auto-deployer/releases):
+
+```bash
+# Linux (x86_64)
+wget https://github.com/eliasfloreteng/github-auto-deployer/releases/latest/download/deployer-linux-amd64
+chmod +x deployer-linux-amd64
+sudo mv deployer-linux-amd64 /usr/local/bin/deployer
+
+# Linux (ARM64)
+wget https://github.com/eliasfloreteng/github-auto-deployer/releases/latest/download/deployer-linux-arm64
+chmod +x deployer-linux-arm64
+sudo mv deployer-linux-arm64 /usr/local/bin/deployer
+
+# macOS (Intel)
+wget https://github.com/eliasfloreteng/github-auto-deployer/releases/latest/download/deployer-darwin-amd64
+chmod +x deployer-darwin-amd64
+sudo mv deployer-darwin-amd64 /usr/local/bin/deployer
+
+# macOS (Apple Silicon)
+wget https://github.com/eliasfloreteng/github-auto-deployer/releases/latest/download/deployer-darwin-arm64
+chmod +x deployer-darwin-arm64
+sudo mv deployer-darwin-arm64 /usr/local/bin/deployer
+
+# Windows (PowerShell)
+Invoke-WebRequest -Uri "https://github.com/eliasfloreteng/github-auto-deployer/releases/latest/download/deployer-windows-amd64.exe" -OutFile "deployer.exe"
+```
+
+### Option 2: Build from Source
 
 ```bash
 go build -o deployer cmd/deployer/main.go
 ```
 
-### 2. Set Up GitHub App
+## Quick Start
+
+### 1. Set Up GitHub App
 
 Follow the detailed instructions in [docs/GITHUB_APP_SETUP.md](docs/GITHUB_APP_SETUP.md) to:
 
@@ -30,7 +61,7 @@ Follow the detailed instructions in [docs/GITHUB_APP_SETUP.md](docs/GITHUB_APP_S
 - Configure webhook settings
 - Install the app on your repositories
 
-### 3. Initialize Configuration
+### 2. Initialize Configuration
 
 ```bash
 ./deployer init
@@ -44,7 +75,7 @@ You'll be prompted to enter:
 - SMTP settings (for failure notifications)
 - Webhook server port (default: 8080)
 
-### 4. Add Folders to Watch
+### 3. Add Folders to Watch
 
 ```bash
 # Add current directory
@@ -67,7 +98,7 @@ The tool will automatically detect:
 - Remote repository URL
 - Suggest appropriate deployment commands
 
-### 5. Install as Service
+### 4. Install as Service
 
 ```bash
 ./deployer install
@@ -80,7 +111,7 @@ This creates a systemd user service that:
 - Logs to journalctl
 - Runs as your user (no sudo required)
 
-### 6. Start the Service
+### 5. Start the Service
 
 ```bash
 systemctl --user start github-deployer
@@ -203,11 +234,11 @@ github-auto-deployer/
 
 ## Requirements
 
-- Go 1.21 or later (for building)
 - Git installed on the server
 - systemd (for service installation)
 - A domain with HTTPS (for webhooks)
 - Reverse proxy (nginx, caddy, etc.)
+- Go 1.21 or later (only if building from source)
 
 ## Security Considerations
 
@@ -283,12 +314,16 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 MIT License - feel free to use this in your own projects.
 
+## Documentation
+
+- [GitHub App Setup Guide](docs/GITHUB_APP_SETUP.md) - How to create and configure a GitHub App
+
 ## Support
 
 For issues and questions:
 
-- Check the [GitHub App Setup Guide](docs/GITHUB_APP_SETUP.md)
-- Review the troubleshooting section above
+- Check the documentation links above
+- Review the troubleshooting section
 - Open an issue on GitHub
 
 ## Acknowledgments
