@@ -68,13 +68,12 @@ var startCmd = &cobra.Command{
 }
 
 var (
-	addPath       string
-	addCommand    string
-	addBranch     string
-	addRepoURL    string
-	addYes        bool
-	addRestart    bool
-	addNoRestart  bool
+	addPath      string
+	addCommand   string
+	addBranch    string
+	addRepoURL   string
+	addYes       bool
+	addNoRestart bool
 )
 
 var addCmd = &cobra.Command{
@@ -86,12 +85,18 @@ All values can be supplied via flags for fully non-interactive use. When a
 flag is omitted, the command falls back to an interactive prompt (unless
 --yes is set, in which case detected/default values are used).
 
+If the systemd service is running, it will be restarted automatically after
+the folder is added. Pass --no-restart to skip the restart.
+
 Examples:
   # Fully non-interactive
   deployer add --path /var/www/app --command "docker compose up -d" --yes
 
   # Use current directory and auto-detected defaults, no prompts
   deployer add --yes
+
+  # Add without restarting the service
+  deployer add --path /var/www/app --yes --no-restart
 
   # Mix flags and prompts
   deployer add --path /var/www/app`,
@@ -103,17 +108,15 @@ Examples:
 		}
 
 		opts := addOptions{
-			path:         path,
-			command:      addCommand,
-			branch:       addBranch,
-			repoURL:      addRepoURL,
-			yes:          addYes,
-			restart:      addRestart,
-			restartSet:   cmd.Flags().Changed("restart") || cmd.Flags().Changed("no-restart"),
-			noRestart:    addNoRestart,
-			commandSet:   cmd.Flags().Changed("command"),
-			branchSet:    cmd.Flags().Changed("branch"),
-			repoURLSet:   cmd.Flags().Changed("repo-url"),
+			path:       path,
+			command:    addCommand,
+			branch:     addBranch,
+			repoURL:    addRepoURL,
+			yes:        addYes,
+			noRestart:  addNoRestart,
+			commandSet: cmd.Flags().Changed("command"),
+			branchSet:  cmd.Flags().Changed("branch"),
+			repoURLSet: cmd.Flags().Changed("repo-url"),
 		}
 
 		if err := runAddFolder(opts); err != nil {
@@ -162,8 +165,7 @@ func init() {
 	addCmd.Flags().StringVarP(&addBranch, "branch", "b", "", "Branch to watch (defaults to the repository's current branch)")
 	addCmd.Flags().StringVarP(&addRepoURL, "repo-url", "u", "", "Repository URL used to match webhooks (defaults to the 'origin' remote)")
 	addCmd.Flags().BoolVarP(&addYes, "yes", "y", false, "Non-interactive mode: skip all prompts and use flag values or detected defaults")
-	addCmd.Flags().BoolVar(&addRestart, "restart", false, "Restart the systemd service after adding the folder (if the service is running)")
-	addCmd.Flags().BoolVar(&addNoRestart, "no-restart", false, "Do not restart the systemd service after adding the folder")
+	addCmd.Flags().BoolVar(&addNoRestart, "no-restart", false, "Do not restart the systemd service after adding the folder (restart is the default)")
 
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(installCmd)
@@ -365,19 +367,13 @@ type addOptions struct {
 	branch     string
 	repoURL    string
 	yes        bool
-	restart    bool
 	noRestart  bool
-	restartSet bool
 	commandSet bool
 	branchSet  bool
 	repoURLSet bool
 }
 
 func runAddFolder(opts addOptions) error {
-	if opts.restart && opts.noRestart {
-		return fmt.Errorf("--restart and --no-restart are mutually exclusive")
-	}
-
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
@@ -519,26 +515,13 @@ func runAddFolder(opts addOptions) error {
 	fmt.Println("Folder added successfully!")
 	fmt.Printf("Watching: %s (branch: %s)\n", repoPath, branch)
 
-	// Decide whether to restart the service.
+	// Restart the service by default if it is running. Pass --no-restart to skip.
 	if isServiceRunning() {
-		var shouldRestart bool
-		switch {
-		case opts.restartSet:
-			shouldRestart = opts.restart && !opts.noRestart
-		case opts.yes:
-			// In non-interactive mode without an explicit --restart flag, don't restart.
-			shouldRestart = false
-			fmt.Println()
-			fmt.Println("Service is running. Remember to restart: systemctl --user restart github-deployer")
-		default:
-			fmt.Println()
-			fmt.Print("Service is running. Restart to apply changes? (y/n): ")
-			response, _ := reader.ReadString('\n')
-			response = strings.TrimSpace(strings.ToLower(response))
-			shouldRestart = response == "y" || response == "yes"
-		}
-
-		if shouldRestart {
+		fmt.Println()
+		if opts.noRestart {
+			fmt.Println("Service is running. Skipping restart (--no-restart).")
+			fmt.Println("Remember to restart: systemctl --user restart github-deployer")
+		} else {
 			fmt.Println("Restarting service...")
 			if err := systemd.Stop(); err != nil {
 				fmt.Printf("Warning: Failed to stop service: %v\n", err)
@@ -547,8 +530,6 @@ func runAddFolder(opts addOptions) error {
 				return fmt.Errorf("failed to start service: %w", err)
 			}
 			fmt.Println("Service restarted successfully!")
-		} else if opts.restartSet {
-			fmt.Println("Skipping service restart. Remember to restart: systemctl --user restart github-deployer")
 		}
 	}
 

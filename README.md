@@ -116,9 +116,9 @@ prompts. See `deployer add --help` for the complete list.
 # Override the detected branch or repository URL
 ./deployer add -p /var/www/app -b main -u https://github.com/me/app --yes
 
-# Skip or force service restart after adding
-./deployer add -p /var/www/app -c "make deploy" --restart
-./deployer add -p /var/www/app -c "make deploy" --no-restart
+# The service is restarted automatically after adding (if running).
+# Pass --no-restart to skip:
+./deployer add -p /var/www/app -c "make deploy" --yes --no-restart
 ```
 
 ### 4. Install as Service
