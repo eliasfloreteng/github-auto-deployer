@@ -78,7 +78,7 @@ You'll be prompted to enter:
 ### 3. Add Folders to Watch
 
 ```bash
-# Add current directory
+# Add current directory (interactive)
 ./deployer add
 
 # Or specify a path
@@ -97,6 +97,29 @@ The tool will automatically detect:
 - Current branch
 - Remote repository URL
 - Suggest appropriate deployment commands
+
+#### Non-interactive / Scripted Use
+
+The `add` command accepts flags so it can be fully configured without
+prompts. See `deployer add --help` for the complete list.
+
+```bash
+# Fully non-interactive
+./deployer add \
+  --path /var/www/app \
+  --command "docker compose up -d --pull=auto --build" \
+  --yes
+
+# Use current directory and auto-detected defaults, no prompts
+./deployer add --yes
+
+# Override the detected branch or repository URL
+./deployer add -p /var/www/app -b main -u https://github.com/me/app --yes
+
+# The service is restarted automatically after adding (if running).
+# Pass --no-restart to skip:
+./deployer add -p /var/www/app -c "make deploy" --yes --no-restart
+```
 
 ### 4. Install as Service
 

@@ -67,17 +67,59 @@ var startCmd = &cobra.Command{
 	},
 }
 
+var (
+	addPath      string
+	addCommand   string
+	addBranch    string
+	addRepoURL   string
+	addYes       bool
+	addNoRestart bool
+)
+
 var addCmd = &cobra.Command{
 	Use:   "add [path]",
 	Short: "Add a folder to watch",
-	Long:  `Add a git repository folder to watch for changes. If no path is provided, uses current directory.`,
-	Args:  cobra.MaximumNArgs(1),
+	Long: `Add a git repository folder to watch for changes.
+
+All values can be supplied via flags for fully non-interactive use. When a
+flag is omitted, the command falls back to an interactive prompt (unless
+--yes is set, in which case detected/default values are used).
+
+If the systemd service is running, it will be restarted automatically after
+the folder is added. Pass --no-restart to skip the restart.
+
+Examples:
+  # Fully non-interactive
+  deployer add --path /var/www/app --command "docker compose up -d" --yes
+
+  # Use current directory and auto-detected defaults, no prompts
+  deployer add --yes
+
+  # Add without restarting the service
+  deployer add --path /var/www/app --yes --no-restart
+
+  # Mix flags and prompts
+  deployer add --path /var/www/app`,
+	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		var path string
-		if len(args) > 0 {
+		path := addPath
+		if path == "" && len(args) > 0 {
 			path = args[0]
 		}
-		if err := runAddFolder(path); err != nil {
+
+		opts := addOptions{
+			path:       path,
+			command:    addCommand,
+			branch:     addBranch,
+			repoURL:    addRepoURL,
+			yes:        addYes,
+			noRestart:  addNoRestart,
+			commandSet: cmd.Flags().Changed("command"),
+			branchSet:  cmd.Flags().Changed("branch"),
+			repoURLSet: cmd.Flags().Changed("repo-url"),
+		}
+
+		if err := runAddFolder(opts); err != nil {
 			log.Fatalf("Failed to add folder: %v", err)
 		}
 	},
@@ -117,6 +159,14 @@ var statusCmd = &cobra.Command{
 }
 
 func init() {
+	// Flags for the `add` command. These allow fully non-interactive use.
+	addCmd.Flags().StringVarP(&addPath, "path", "p", "", "Path to the git repository (defaults to the positional argument or current directory)")
+	addCmd.Flags().StringVarP(&addCommand, "command", "c", "", "Command to execute after pulling (e.g. 'docker compose up -d --pull=auto --build')")
+	addCmd.Flags().StringVarP(&addBranch, "branch", "b", "", "Branch to watch (defaults to the repository's current branch)")
+	addCmd.Flags().StringVarP(&addRepoURL, "repo-url", "u", "", "Repository URL used to match webhooks (defaults to the 'origin' remote)")
+	addCmd.Flags().BoolVarP(&addYes, "yes", "y", false, "Non-interactive mode: skip all prompts and use flag values or detected defaults")
+	addCmd.Flags().BoolVar(&addNoRestart, "no-restart", false, "Do not restart the systemd service after adding the folder (restart is the default)")
+
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(installCmd)
 	rootCmd.AddCommand(uninstallCmd)
@@ -310,7 +360,20 @@ func runStart() error {
 	return nil
 }
 
-func runAddFolder(providedPath string) error {
+// addOptions holds parsed flag values for the `add` command.
+type addOptions struct {
+	path       string
+	command    string
+	branch     string
+	repoURL    string
+	yes        bool
+	noRestart  bool
+	commandSet bool
+	branchSet  bool
+	repoURLSet bool
+}
+
+func runAddFolder(opts addOptions) error {
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
@@ -320,11 +383,17 @@ func runAddFolder(providedPath string) error {
 	reader := bufio.NewReader(os.Stdin)
 	var repoPath string
 
-	// If path was provided as argument, use it; otherwise prompt
-	if providedPath != "" {
-		repoPath = providedPath
+	// Resolve repository path
+	if opts.path != "" {
+		repoPath = opts.path
+	} else if opts.yes {
+		// Default to current directory in non-interactive mode
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+		repoPath = cwd
 	} else {
-		// Default to current directory
 		cwd, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("failed to get current directory: %w", err)
@@ -344,15 +413,6 @@ func runAddFolder(providedPath string) error {
 		}
 	}
 
-	// Convert to absolute path
-	if !filepath.IsAbs(repoPath) {
-		absPath, err := filepath.Abs(repoPath)
-		if err != nil {
-			return fmt.Errorf("failed to convert to absolute path: %w", err)
-		}
-		repoPath = absPath
-	}
-
 	// Expand ~ to home directory
 	if strings.HasPrefix(repoPath, "~") {
 		home, err := os.UserHomeDir()
@@ -362,43 +422,79 @@ func runAddFolder(providedPath string) error {
 		repoPath = filepath.Join(home, repoPath[1:])
 	}
 
+	// Convert to absolute path
+	if !filepath.IsAbs(repoPath) {
+		absPath, err := filepath.Abs(repoPath)
+		if err != nil {
+			return fmt.Errorf("failed to convert to absolute path: %w", err)
+		}
+		repoPath = absPath
+	}
+
 	// Verify it's a git repository
 	if !git.IsGitRepository(repoPath) {
 		return fmt.Errorf("not a git repository: %s", repoPath)
 	}
 
-	// Get current branch and remote URL
+	// Get current branch and remote URL (used as defaults when flags aren't set)
 	gitMgr := git.NewManager(repoPath)
 
-	branch, err := gitMgr.GetCurrentBranch()
+	detectedBranch, err := gitMgr.GetCurrentBranch()
 	if err != nil {
 		return fmt.Errorf("failed to get current branch: %w", err)
 	}
 
-	repoURL, err := gitMgr.GetRemoteURL()
+	detectedRepoURL, err := gitMgr.GetRemoteURL()
 	if err != nil {
 		return fmt.Errorf("failed to get remote URL: %w", err)
 	}
 
-	fmt.Printf("Detected branch: %s\n", branch)
-	fmt.Printf("Detected repository: %s\n", repoURL)
+	branch := detectedBranch
+	if opts.branchSet && opts.branch != "" {
+		branch = opts.branch
+	}
+
+	repoURL := detectedRepoURL
+	if opts.repoURLSet && opts.repoURL != "" {
+		repoURL = opts.repoURL
+	}
+
+	fmt.Printf("Detected branch: %s\n", detectedBranch)
+	fmt.Printf("Detected repository: %s\n", detectedRepoURL)
+	if branch != detectedBranch {
+		fmt.Printf("Using branch override: %s\n", branch)
+	}
+	if repoURL != detectedRepoURL {
+		fmt.Printf("Using repo URL override: %s\n", repoURL)
+	}
 	fmt.Println()
 
 	// Suggest default command based on what's in the repository
 	defaultCmd := suggestDefaultCommand(repoPath)
-	if defaultCmd != "" {
-		fmt.Printf("Command to execute after pull (default: %s): ", defaultCmd)
-	} else {
-		fmt.Print("Command to execute after pull (e.g., 'docker compose up -d --pull=auto --build'): ")
-	}
 
-	command, _ := reader.ReadString('\n')
-	command = strings.TrimSpace(command)
-
-	// Use default if no command provided
-	if command == "" && defaultCmd != "" {
+	var command string
+	switch {
+	case opts.commandSet:
+		command = opts.command
+	case opts.yes:
 		command = defaultCmd
-		fmt.Printf("Using default command: %s\n", command)
+		if command != "" {
+			fmt.Printf("Using default command: %s\n", command)
+		}
+	default:
+		if defaultCmd != "" {
+			fmt.Printf("Command to execute after pull (default: %s): ", defaultCmd)
+		} else {
+			fmt.Print("Command to execute after pull (e.g., 'docker compose up -d --pull=auto --build'): ")
+		}
+
+		input, _ := reader.ReadString('\n')
+		command = strings.TrimSpace(input)
+
+		if command == "" && defaultCmd != "" {
+			command = defaultCmd
+			fmt.Printf("Using default command: %s\n", command)
+		}
 	}
 
 	// Add folder to configuration
@@ -419,14 +515,13 @@ func runAddFolder(providedPath string) error {
 	fmt.Println("Folder added successfully!")
 	fmt.Printf("Watching: %s (branch: %s)\n", repoPath, branch)
 
-	// Check if service is running and offer to restart
+	// Restart the service by default if it is running. Pass --no-restart to skip.
 	if isServiceRunning() {
 		fmt.Println()
-		fmt.Print("Service is running. Restart to apply changes? (y/n): ")
-		response, _ := reader.ReadString('\n')
-		response = strings.TrimSpace(strings.ToLower(response))
-
-		if response == "y" || response == "yes" {
+		if opts.noRestart {
+			fmt.Println("Service is running. Skipping restart (--no-restart).")
+			fmt.Println("Remember to restart: systemctl --user restart github-deployer")
+		} else {
 			fmt.Println("Restarting service...")
 			if err := systemd.Stop(); err != nil {
 				fmt.Printf("Warning: Failed to stop service: %v\n", err)
@@ -435,8 +530,6 @@ func runAddFolder(providedPath string) error {
 				return fmt.Errorf("failed to start service: %w", err)
 			}
 			fmt.Println("Service restarted successfully!")
-		} else {
-			fmt.Println("Remember to restart the service: systemctl --user restart github-deployer")
 		}
 	}
 
