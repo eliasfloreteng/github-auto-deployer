@@ -177,7 +177,7 @@ loginctl enable-linger $USER
 
 3. Follow the prompts:
    - Enter the repository path
-   - Enter the command to run after pulling (e.g., `docker compose up -d --pull=auto --build`)
+   - Enter the command to run after pulling (e.g., `docker compose up -d --pull=always --build`)
 
 ## Step 8: Test the Setup
 

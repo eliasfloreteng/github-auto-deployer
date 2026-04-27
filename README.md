@@ -107,7 +107,7 @@ prompts. See `deployer add --help` for the complete list.
 # Fully non-interactive
 ./deployer add \
   --path /var/www/app \
-  --command "docker compose up -d --pull=auto --build" \
+  --command "docker compose up -d --pull=always --build" \
   --yes
 
 # Use current directory and auto-detected defaults, no prompts
@@ -209,7 +209,7 @@ Example configuration:
   "folders": [
     {
       "path": "/var/www/myapp",
-      "command": "docker compose up -d --pull=auto --build",
+      "command": "docker compose up -d --pull=always --build",
       "branch": "main",
       "repo_url": "https://github.com/username/myapp"
     }
@@ -305,7 +305,7 @@ github-auto-deployer/
 
 ```bash
 # Command to run after pull
-docker compose up -d --pull=auto --build
+docker compose up -d --pull=always --build
 ```
 
 ### Node.js Application
