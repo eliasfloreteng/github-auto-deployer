@@ -161,7 +161,7 @@ var statusCmd = &cobra.Command{
 func init() {
 	// Flags for the `add` command. These allow fully non-interactive use.
 	addCmd.Flags().StringVarP(&addPath, "path", "p", "", "Path to the git repository (defaults to the positional argument or current directory)")
-	addCmd.Flags().StringVarP(&addCommand, "command", "c", "", "Command to execute after pulling (e.g. 'docker compose up -d --pull=auto --build')")
+	addCmd.Flags().StringVarP(&addCommand, "command", "c", "", "Command to execute after pulling (e.g. 'docker compose up -d --pull=always --build')")
 	addCmd.Flags().StringVarP(&addBranch, "branch", "b", "", "Branch to watch (defaults to the repository's current branch)")
 	addCmd.Flags().StringVarP(&addRepoURL, "repo-url", "u", "", "Repository URL used to match webhooks (defaults to the 'origin' remote)")
 	addCmd.Flags().BoolVarP(&addYes, "yes", "y", false, "Non-interactive mode: skip all prompts and use flag values or detected defaults")
@@ -485,7 +485,7 @@ func runAddFolder(opts addOptions) error {
 		if defaultCmd != "" {
 			fmt.Printf("Command to execute after pull (default: %s): ", defaultCmd)
 		} else {
-			fmt.Print("Command to execute after pull (e.g., 'docker compose up -d --pull=auto --build'): ")
+			fmt.Print("Command to execute after pull (e.g., 'docker compose up -d --pull=always --build'): ")
 		}
 
 		input, _ := reader.ReadString('\n')
@@ -660,7 +660,7 @@ func suggestDefaultCommand(repoPath string) string {
 		fileExists(filepath.Join(repoPath, "compose.yml")) ||
 		fileExists(filepath.Join(repoPath, "docker-compose.yaml")) ||
 		fileExists(filepath.Join(repoPath, "compose.yaml")) {
-		return "docker compose up -d --pull=auto --build"
+		return "docker compose up -d --pull=always --build"
 	}
 
 	// Check for Dockerfile
